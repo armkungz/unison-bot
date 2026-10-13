@@ -66,11 +66,12 @@ const client = new Client({
         GatewayIntentBits.Guilds, 
         GatewayIntentBits.GuildMessages, 
         GatewayIntentBits.MessageContent 
-    ] 
+    ],
+    rest: { timeout: 15000 } // บังคับให้แจ้ง Error ถ้าเชื่อมต่อเกิน 15 วินาที จะได้ไม่ค้าง
 });
 
 client.once(Events.ClientReady, c => {
-    console.log(`Bot is ready! Logged in as ${c.user.tag}`);
+    console.log(`✅ Bot is ready! Logged in as ${c.user.tag}`);
 });
 
 // คำสั่ง !setup
@@ -162,13 +163,35 @@ client.on('debug', info => console.log(`[DISCORD DEBUG] ${info}`));
 client.on('warn', warn => console.log(`[DISCORD WARN] ${warn}`));
 client.on('error', error => console.error(`[DISCORD ERROR]`, error));
 
-// เพิ่มระบบ Debug ช่วยค้นหา Error ตอน Login
-console.log("กำลังพยายามเชื่อมต่อ Discord...");
-if (!config.token) console.log("❌ ไม่พบ Token ในระบบ! (อ่านค่าจากเว็บ Render ไม่ได้)");
+// เพิ่มระบบตรวจสอบเครือข่ายก่อน Login (Pre-flight Network Check)
+async function startBot() {
+    console.log("กำลังทดสอบการเชื่อมต่อเซิร์ฟเวอร์ Discord (Pre-flight Check)...");
+    
+    try {
+        const response = await fetch('https://discord.com/api/v10/gateway', {
+            signal: AbortSignal.timeout(10000) // รอสูงสุด 10 วินาที
+        });
+        
+        if (response.ok) {
+            console.log("✅ เครือข่ายปกติ สามารถเข้าถึง Discord API ได้");
+            
+            console.log("กำลังพยายามเชื่อมต่อด้วย Token...");
+            client.login(config.token).catch(err => {
+                console.error("❌ เกิดข้อผิดพลาดในการ Login เข้า Discord:");
+                console.error(err);
+            });
+        } else {
+            console.log(`❌ Discord API ตอบกลับด้วยสถานะ: ${response.status}`);
+        }
+    } catch (error) {
+        console.error("🛑 [CRITICAL ERROR] ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ Discord ได้!");
+        console.error("เซิร์ฟเวอร์ Render เครื่องนี้ถูก Discord (Cloudflare) บล็อก IP อย่างสมบูรณ์");
+        console.error(error.message);
+    }
+}
 
-client.login(config.token)
-    .then(() => console.log("✅ ส่งคำขอ Login สำเร็จ รอ Discord ตอบกลับ..."))
-    .catch(err => {
-        console.error("❌ เกิดข้อผิดพลาดในการ Login เข้า Discord:");
-        console.error(err);
-    });
+if (!config.token) {
+    console.log("❌ ไม่พบ Token ในระบบ! (อ่านค่าจากเว็บ Render ไม่ได้)");
+} else {
+    startBot();
+}
