@@ -23,7 +23,7 @@ app.get('/', (req, res) => {
 });
 
 app.listen(port, () => {
-    console.log(`Web server is running on port ${port}`);
+    console.log(`✅ Web server is running on port ${port}`);
 });
 // ---------------------------------------------
 
@@ -158,13 +158,20 @@ client.on(Events.InteractionCreate, async interaction => {
     }
 });
 
+// ดักจับและแจ้งเตือนเมื่อบอทโดน Rate Limit จาก Discord ภายใน Client
+client.rest.on('rateLimited', (rateLimitInfo) => {
+    console.warn('⚠️ แจ้งเตือน: บอทติด Rate Limit จาก Discord API:');
+    console.warn(`   - Route: ${rateLimitInfo.route}`);
+    console.warn(`   - Timeout: ${rateLimitInfo.timeToReset}ms`);
+});
+
 // ดึง Log ระดับลึกของ Discord.js ออกมาดู
 client.on('debug', info => console.log(`[DISCORD DEBUG] ${info}`));
 client.on('warn', warn => console.log(`[DISCORD WARN] ${warn}`));
 client.on('error', error => console.error(`[DISCORD ERROR]`, error));
 
-// เพิ่มระบบตรวจสอบเครือข่ายก่อน Login (Pre-flight Network Check)
-async function startBot() {
+// เพิ่มระบบตรวจสอบเครือข่ายก่อน Login (Pre-flight Network Check) + ระบบ Retry
+async function startBot(retries = 6, delay = 5000) {
     console.log("กำลังทดสอบการเชื่อมต่อเซิร์ฟเวอร์ Discord (Pre-flight Check)...");
     
     try {
@@ -182,13 +189,35 @@ async function startBot() {
             });
         } else {
             console.log(`❌ Discord API ตอบกลับด้วยสถานะ: ${response.status}`);
+            
+            // หากติด 429 (Too Many Requests) หรือปัญหา Server อื่นๆ ให้ทำการ Retry
+            if (response.status === 429 && retries > 0) {
+                console.log(`⚠️ รอ ${delay / 1000} วินาทีเพื่อลองใหม่... (เหลือสิทธิ์ลองอีก ${retries} ครั้ง)`);
+                setTimeout(() => startBot(retries - 1, delay * 2), delay);
+            } else if (retries === 0) {
+                console.error("🛑 [CRITICAL ERROR] หมดโควต้าการลองใหม่! เซิร์ฟเวอร์ Render เครื่องนี้ถูก Discord บล็อก IP อย่างสมบูรณ์");
+                console.error("💡 คำแนะนำ: ให้กด Suspend หรือ Stop บน Render ทิ้งไว้ 30-60 นาที แล้วค่อยกด Resume เพื่อให้ได้ IP ใหม่ / ปลดล็อค Rate Limit");
+            }
         }
     } catch (error) {
         console.error("🛑 [CRITICAL ERROR] ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ Discord ได้!");
-        console.error("เซิร์ฟเวอร์ Render เครื่องนี้ถูก Discord (Cloudflare) บล็อก IP อย่างสมบูรณ์");
         console.error(error.message);
+        
+        if (retries > 0) {
+            console.log(`⚠️ รอ ${delay / 1000} วินาทีเพื่อลองใหม่... (เหลือสิทธิ์ลองอีก ${retries} ครั้ง)`);
+            setTimeout(() => startBot(retries - 1, delay * 2), delay);
+        }
     }
 }
+
+// ป้องกันแอปแครชจาก Unhandled Promise Rejections และ Uncaught Exceptions
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('❌ Unhandled Rejection:', reason);
+});
+
+process.on('uncaughtException', (error) => {
+    console.error('❌ Uncaught Exception:', error);
+});
 
 if (!config.token) {
     console.log("❌ ไม่พบ Token ในระบบ! (อ่านค่าจากเว็บ Render ไม่ได้)");
