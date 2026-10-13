@@ -11,8 +11,8 @@ const fs = require('fs');
 
 // ตั้งค่า Token และ ID ช่อง
 const config = {
-    token: 'YOUR_BOT_TOKEN',
-    logChannelId: 'https://discord.com/oauth2/authorize?client_id=1559013900924485742&permissions=8&integration_type=0&scope=bot'
+    token: process.env.BOT_TOKEN,
+    logChannelId: '1559104694150758410'
 };
 
 // ไฟล์สำหรับเก็บข้อมูล ป้องกันข้อมูลหายตอนบอทรีสตาร์ทหรือปิดรันใหม่
