@@ -1,13 +1,27 @@
-const {
-    Client,
-    GatewayIntentBits,
-    ActionRowBuilder,
-    ButtonBuilder,
-    ButtonStyle,
-    EmbedBuilder,
-    Events
+const { 
+    Client, 
+    GatewayIntentBits, 
+    ActionRowBuilder, 
+    ButtonBuilder, 
+    ButtonStyle, 
+    EmbedBuilder, 
+    Events 
 } = require('discord.js');
 const fs = require('fs');
+const express = require('express');
+
+// --- ส่วนของ Web Server สำหรับรองรับ cron-job.org ---
+const app = express();
+const port = process.env.PORT || 3000;
+
+app.get('/', (req, res) => {
+    res.send('Discord Check-in Bot is online!');
+});
+
+app.listen(port, () => {
+    console.log(`Web server is running on port ${port}`);
+});
+// ---------------------------------------------
 
 // ตั้งค่า Token และ ID ช่อง
 const config = {
@@ -15,7 +29,7 @@ const config = {
     logChannelId: '1559104694150758410'
 };
 
-// ไฟล์สำหรับเก็บข้อมูล ป้องกันข้อมูลหายตอนบอทรีสตาร์ทหรือปิดรันใหม่
+// ไฟล์สำหรับเก็บข้อมูล
 const DATA_FILE = './checkin_data.json';
 
 function loadData() {
@@ -29,13 +43,13 @@ function saveData(data) {
     fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 4), 'utf8');
 }
 
-// ฟังก์ชันแปลงหน่วย Milliseconds เป็น ชั่วโมง นาที วินาที
+// ฟังก์ชันแปลงหน่วย Milliseconds
 function formatDuration(ms) {
     const totalSeconds = Math.floor(ms / 1000);
     const hours = Math.floor(totalSeconds / 3600);
     const minutes = Math.floor((totalSeconds % 3600) / 60);
     const seconds = totalSeconds % 60;
-
+    
     let result = '';
     if (hours > 0) result += `${hours} ชม. `;
     if (minutes > 0) result += `${minutes} นาที `;
@@ -43,19 +57,19 @@ function formatDuration(ms) {
     return result;
 }
 
-const client = new Client({
+const client = new Client({ 
     intents: [
-        GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.MessageContent
-    ]
+        GatewayIntentBits.Guilds, 
+        GatewayIntentBits.GuildMessages, 
+        GatewayIntentBits.MessageContent 
+    ] 
 });
 
 client.once(Events.ClientReady, c => {
     console.log(`Bot is ready! Logged in as ${c.user.tag}`);
 });
 
-// พิมพ์ !setup เพื่อสร้างแผงปุ่มกด เข้า-ออก งาน
+// คำสั่ง !setup
 client.on(Events.MessageCreate, async message => {
     if (message.content === '!setup' && message.member.permissions.has('Administrator')) {
         const embed = new EmbedBuilder()
@@ -80,7 +94,7 @@ client.on(Events.MessageCreate, async message => {
     }
 });
 
-// จัดการการกดปุ่มเช็คอินและเช็คเอาท์
+// จัดการการกดปุ่ม
 client.on(Events.InteractionCreate, async interaction => {
     if (!interaction.isButton()) return;
 
@@ -88,16 +102,12 @@ client.on(Events.InteractionCreate, async interaction => {
     let data = loadData();
     const logChannel = client.channels.cache.get(config.logChannelId);
 
-    // กรณีผู้ใช้กด เช็คอิน
     if (interaction.customId === 'btn_checkin') {
         if (data[userId] && data[userId].checkInTime) {
             return interaction.reply({ content: '❌ คุณได้ทำการเช็คอินไปแล้ว กรุณาเช็คเอาท์ก่อนทำรายการใหม่ครับ', ephemeral: true });
         }
 
-        // บันทึกเวลาปัจจุบัน
-        data[userId] = {
-            checkInTime: Date.now()
-        };
+        data[userId] = { checkInTime: Date.now() };
         saveData(data);
 
         await interaction.reply({ content: '✅ บันทึกเวลาเข้างานเรียบร้อยแล้ว!', ephemeral: true });
@@ -114,7 +124,6 @@ client.on(Events.InteractionCreate, async interaction => {
         }
     }
 
-    // กรณีผู้ใช้กด เช็คเอาท์
     if (interaction.customId === 'btn_checkout') {
         if (!data[userId] || !data[userId].checkInTime) {
             return interaction.reply({ content: '❌ คุณยังไม่ได้ทำการเช็คอินครับ', ephemeral: true });
@@ -122,15 +131,13 @@ client.on(Events.InteractionCreate, async interaction => {
 
         const checkInTime = data[userId].checkInTime;
         const checkOutTime = Date.now();
-        const durationMs = checkOutTime - checkInTime; // หาเวลาส่วนต่าง
-
-        // ลบข้อมูลเช็คอินออกหลังจากเช็คเอาท์เสร็จ เพื่อให้พร้อมสำหรับการเช็คอินรอบถัดไป
+        const durationMs = checkOutTime - checkInTime; 
+        
         delete data[userId];
         saveData(data);
 
         await interaction.reply({ content: '✅ บันทึกเวลาออกงานและสรุปยอดเรียบร้อยแล้ว!', ephemeral: true });
 
-        // ส่งสรุปเวลาไปที่ช่อง Log
         if (logChannel) {
             const embed = new EmbedBuilder()
                 .setTitle('📤 เช็คเอาท์และสรุปเวลา')
