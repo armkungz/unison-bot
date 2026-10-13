@@ -75,16 +75,16 @@ client.on(Events.MessageCreate, async message => {
         const embed = new EmbedBuilder()
             .setColor('#2b2d31')
             .setTitle('🕒 ระบบเช็คอิน - เช็คเอาท์')
-            .setDescription('กดปุ่มด้านล่างเพื่อบันทึกเวลาเข้าและออกงานของคุณ');
+            .setDescription('กดปุ่มด้านล่างเพื่อบันทึกเวลาเข้าและออกของคุณ');
 
         const btnCheckIn = new ButtonBuilder()
             .setCustomId('btn_checkin')
-            .setLabel('เข้างาน (Check-In)')
+            .setLabel('เข้า (Check-In)')
             .setStyle(ButtonStyle.Success);
 
         const btnCheckOut = new ButtonBuilder()
             .setCustomId('btn_checkout')
-            .setLabel('ออกงาน (Check-Out)')
+            .setLabel('ออก (Check-Out)')
             .setStyle(ButtonStyle.Danger);
 
         const row = new ActionRowBuilder().addComponents(btnCheckIn, btnCheckOut);
@@ -110,11 +110,11 @@ client.on(Events.InteractionCreate, async interaction => {
         data[userId] = { checkInTime: Date.now() };
         saveData(data);
 
-        await interaction.reply({ content: '✅ บันทึกเวลาเข้างานเรียบร้อยแล้ว!', ephemeral: true });
+        await interaction.reply({ content: '✅ บันทึกเวลาเข้าเรียบร้อยแล้ว!', ephemeral: true });
 
         if (logChannel) {
             const embed = new EmbedBuilder()
-                .setTitle('📥 เช็คอินเข้างาน')
+                .setTitle('📥 เช็คอินเข้า')
                 .setColor('#00ff00')
                 .addFields(
                     { name: 'ผู้ใช้งาน', value: `<@${userId}>`, inline: true },
@@ -136,7 +136,7 @@ client.on(Events.InteractionCreate, async interaction => {
         delete data[userId];
         saveData(data);
 
-        await interaction.reply({ content: '✅ บันทึกเวลาออกงานและสรุปยอดเรียบร้อยแล้ว!', ephemeral: true });
+        await interaction.reply({ content: '✅ บันทึกเวลาออกและสรุปยอดเรียบร้อยแล้ว!', ephemeral: true });
 
         if (logChannel) {
             const embed = new EmbedBuilder()
@@ -146,7 +146,7 @@ client.on(Events.InteractionCreate, async interaction => {
                     { name: 'ผู้ใช้งาน', value: `<@${userId}>`, inline: true },
                     { name: 'เวลาเข้า', value: `<t:${Math.floor(checkInTime / 1000)}:T>`, inline: true },
                     { name: 'เวลาออก', value: `<t:${Math.floor(checkOutTime / 1000)}:T>`, inline: true },
-                    { name: 'รวมเวลาทำงานทั้งหมด', value: `\`${formatDuration(durationMs)}\``, inline: false }
+                    { name: 'รวมเวลาทั้งหมด', value: `\`${formatDuration(durationMs)}\``, inline: false }
                 );
             await logChannel.send({ embeds: [embed] });
         }
