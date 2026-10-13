@@ -153,4 +153,13 @@ client.on(Events.InteractionCreate, async interaction => {
     }
 });
 
-client.login(config.token);
+// เพิ่มระบบ Debug ช่วยค้นหา Error ตอน Login
+console.log("กำลังพยายามเชื่อมต่อ Discord...");
+if (!config.token) console.log("❌ ไม่พบ Token ในระบบ! (อ่านค่าจากเว็บ Render ไม่ได้)");
+
+client.login(config.token)
+    .then(() => console.log("✅ ส่งคำขอ Login สำเร็จ รอ Discord ตอบกลับ..."))
+    .catch(err => {
+        console.error("❌ เกิดข้อผิดพลาดในการ Login เข้า Discord:");
+        console.error(err);
+    });
