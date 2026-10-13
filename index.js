@@ -67,7 +67,10 @@ const client = new Client({
         GatewayIntentBits.GuildMessages, 
         GatewayIntentBits.MessageContent 
     ],
-    rest: { timeout: 15000 } // บังคับให้แจ้ง Error ถ้าเชื่อมต่อเกิน 15 วินาที จะได้ไม่ค้าง
+    rest: { 
+        timeout: 15000, 
+        retries: 5 // ให้ discord.js จัดการ Retry เองเมื่อเจอ 429
+    }
 });
 
 client.once(Events.ClientReady, c => {
@@ -158,60 +161,29 @@ client.on(Events.InteractionCreate, async interaction => {
     }
 });
 
-// ดักจับและแจ้งเตือนเมื่อบอทโดน Rate Limit จาก Discord ภายใน Client
-client.rest.on('rateLimited', (rateLimitInfo) => {
-    console.warn('⚠️ แจ้งเตือน: บอทติด Rate Limit จาก Discord API:');
-    console.warn(`   - Route: ${rateLimitInfo.route}`);
-    console.warn(`   - Timeout: ${rateLimitInfo.timeToReset}ms`);
+// ดักจับ Rate Limit ผ่านระบบของ discord.js
+client.rest.on('rateLimited', (info) => {
+    console.warn('⚠️ แจ้งเตือน: บอทติด Rate Limit จาก Discord API');
+    console.warn(`   - Route: ${info.route}`);
+    console.warn(`   - จะลองใหม่ในอีก: ${info.timeToReset}ms`);
 });
 
-// ดึง Log ระดับลึกของ Discord.js ออกมาดู
-client.on('debug', info => console.log(`[DISCORD DEBUG] ${info}`));
-client.on('warn', warn => console.log(`[DISCORD WARN] ${warn}`));
 client.on('error', error => console.error(`[DISCORD ERROR]`, error));
 
-// เพิ่มระบบตรวจสอบเครือข่ายก่อน Login (Pre-flight Network Check) + ระบบ Retry
-async function startBot(retries = 6, delay = 5000) {
-    console.log("กำลังทดสอบการเชื่อมต่อเซิร์ฟเวอร์ Discord (Pre-flight Check)...");
-    
+// เชื่อมต่อบอท
+async function startBot() {
+    console.log("กำลังพยายามเชื่อมต่อเซิร์ฟเวอร์ Discord...");
     try {
-        const response = await fetch('https://discord.com/api/v10/gateway', {
-            signal: AbortSignal.timeout(10000) // รอสูงสุด 10 วินาที
-        });
-        
-        if (response.ok) {
-            console.log("✅ เครือข่ายปกติ สามารถเข้าถึง Discord API ได้");
-            
-            console.log("กำลังพยายามเชื่อมต่อด้วย Token...");
-            client.login(config.token).catch(err => {
-                console.error("❌ เกิดข้อผิดพลาดในการ Login เข้า Discord:");
-                console.error(err);
-            });
-        } else {
-            console.log(`❌ Discord API ตอบกลับด้วยสถานะ: ${response.status}`);
-            
-            // หากติด 429 (Too Many Requests) หรือปัญหา Server อื่นๆ ให้ทำการ Retry
-            if (response.status === 429 && retries > 0) {
-                console.log(`⚠️ รอ ${delay / 1000} วินาทีเพื่อลองใหม่... (เหลือสิทธิ์ลองอีก ${retries} ครั้ง)`);
-                setTimeout(() => startBot(retries - 1, delay * 2), delay);
-            } else if (retries === 0) {
-                console.error("🛑 [CRITICAL ERROR] หมดโควต้าการลองใหม่! เซิร์ฟเวอร์ Render เครื่องนี้ถูก Discord บล็อก IP อย่างสมบูรณ์");
-                console.error("💡 คำแนะนำ: ให้กด Suspend หรือ Stop บน Render ทิ้งไว้ 30-60 นาที แล้วค่อยกด Resume เพื่อให้ได้ IP ใหม่ / ปลดล็อค Rate Limit");
-            }
-        }
+        await client.login(config.token);
     } catch (error) {
         console.error("🛑 [CRITICAL ERROR] ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ Discord ได้!");
-        console.error(error.message);
-        
-        if (retries > 0) {
-            console.log(`⚠️ รอ ${delay / 1000} วินาทีเพื่อลองใหม่... (เหลือสิทธิ์ลองอีก ${retries} ครั้ง)`);
-            setTimeout(() => startBot(retries - 1, delay * 2), delay);
-        }
+        console.error("สาเหตุ:", error.message);
+        console.error("💡 หากยังติด Rate Limit อยู่ เป็นไปได้สูงว่า IP ของ Render เครื่องนี้ถูกแบน แนะนำให้ทิ้งไว้ 1 ชม. หรือย้ายไป Host อื่น");
     }
 }
 
-// ป้องกันแอปแครชจาก Unhandled Promise Rejections และ Uncaught Exceptions
-process.on('unhandledRejection', (reason, promise) => {
+// ป้องกันแอปแครชจาก Unhandled Promise Rejections
+process.on('unhandledRejection', (reason) => {
     console.error('❌ Unhandled Rejection:', reason);
 });
 
