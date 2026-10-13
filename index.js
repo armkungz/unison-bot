@@ -153,6 +153,11 @@ client.on(Events.InteractionCreate, async interaction => {
     }
 });
 
+// ดึง Log ระดับลึกของ Discord.js ออกมาดู
+client.on('debug', info => console.log(`[DISCORD DEBUG] ${info}`));
+client.on('warn', warn => console.log(`[DISCORD WARN] ${warn}`));
+client.on('error', error => console.error(`[DISCORD ERROR]`, error));
+
 // เพิ่มระบบ Debug ช่วยค้นหา Error ตอน Login
 console.log("กำลังพยายามเชื่อมต่อ Discord...");
 if (!config.token) console.log("❌ ไม่พบ Token ในระบบ! (อ่านค่าจากเว็บ Render ไม่ได้)");
