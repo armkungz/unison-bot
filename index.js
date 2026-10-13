@@ -1,3 +1,7 @@
+// ฝังคำสั่งบังคับใช้ IPv4 ทันทีเพื่อทะลุกำแพงเครือข่ายของเซิร์ฟเวอร์
+const dns = require('node:dns');
+dns.setDefaultResultOrder('ipv4first');
+
 const { 
     Client, 
     GatewayIntentBits, 
